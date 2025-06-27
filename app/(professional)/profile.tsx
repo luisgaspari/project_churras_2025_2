@@ -80,56 +80,60 @@ export default function ProfessionalProfileScreen() {
     if (!session?.user) return;
     setUploading(true);
 
-    const photo = {
-      uri,
-      type: 'image/jpeg',
-      name: `${session.user.id}/${new Date().getTime()}.jpg`,
-    };
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
 
-    const formData = new FormData();
-    formData.append('file', photo as any);
+      const cleanUri = uri.split('?')[0];
+      const uriParts = cleanUri.split('.');
+      const fileExt = uriParts[uriParts.length - 1]?.toLowerCase() || 'jpg';
+      const fileName = `${session.user.id}/${new Date().getTime()}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('professional_photos')
-      .upload(photo.name, formData);
+      const { error: uploadError } = await supabase.storage
+        .from('professional_photos')
+        .upload(fileName, blob, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: blob.type || `image/${fileExt}`,
+        });
 
-    if (uploadError) {
-      Alert.alert('Erro', 'Não foi possível enviar a foto.');
-      setUploading(false);
-      return;
-    }
+      if (uploadError) {
+        throw uploadError;
+      }
 
-    const { data: publicUrlData } = supabase.storage
-      .from('professional_photos')
-      .getPublicUrl(photo.name);
+      const { data: publicUrlData } = supabase.storage
+        .from('professional_photos')
+        .getPublicUrl(fileName);
 
-    if (!publicUrlData) {
-      Alert.alert('Erro', 'Não foi possível obter a URL da foto.');
-      setUploading(false);
-      return;
-    }
+      if (!publicUrlData) {
+        throw new Error('Não foi possível obter a URL da foto.');
+      }
 
-    const { error: dbError } = await supabase
-      .from('professional_photos')
-      .insert({
-        professional_id: session.user.id,
-        photo_url: publicUrlData.publicUrl,
-      });
+      const { error: dbError } = await supabase
+        .from('professional_photos')
+        .insert({
+          professional_id: session.user.id,
+          photo_url: publicUrlData.publicUrl,
+        });
 
-    if (dbError) {
-      Alert.alert('Erro', 'Não foi possível salvar a foto no perfil.');
-    } else {
+      if (dbError) {
+        throw dbError;
+      }
+
       Alert.alert('Sucesso', 'Foto adicionada!');
       fetchPhotos();
+    } catch (error: any) {
+      console.error('Erro ao enviar foto:', error);
+      Alert.alert('Erro', error.message || 'Não foi possível enviar a foto.');
+    } finally {
+      setUploading(false);
     }
-
-    setUploading(false);
   };
 
   const handleUpdateAvatar = async (source: 'camera' | 'gallery') => {
     let result;
     const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ['images'],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -186,7 +190,6 @@ export default function ProfessionalProfileScreen() {
     setUploadingAvatar(true);
 
     try {
-<<<<<<< HEAD
       const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${session.user.id}.${fileExt}`;
 
@@ -202,63 +205,28 @@ export default function ProfessionalProfileScreen() {
         .upload(fileName, formData, {
           cacheControl: '3600',
           upsert: true,
-=======
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      if (blob.size === 0) {
-        Alert.alert(
-          'Erro',
-          'Não foi possível ler a imagem selecionada. Tente novamente.'
-        );
-        setUploadingAvatar(false);
-        return;
-      }
-
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const filePath = `${session.user.id}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, blob, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: blob.type || `image/${fileExt}`,
->>>>>>> 942f1eb1d078be4cea5a491c68c819bc53a6a362
         });
 
       if (uploadError) {
         throw uploadError;
       }
 
-<<<<<<< HEAD
       // We need to wait a bit for the CDN to update
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       const { data: publicUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
-=======
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
->>>>>>> 942f1eb1d078be4cea5a491c68c819bc53a6a362
 
       if (!publicUrlData) {
         throw new Error('Não foi possível obter a URL pública do avatar.');
       }
 
-<<<<<<< HEAD
       const finalUrl = `${publicUrlData.publicUrl}?t=${new Date().getTime()}`;
 
       const { error: dbError } = await supabase
         .from('profiles')
         .update({ avatar_url: finalUrl })
-=======
-      const { error: dbError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrlData.publicUrl })
->>>>>>> 942f1eb1d078be4cea5a491c68c819bc53a6a362
         .eq('id', session.user.id);
 
       if (dbError) {
